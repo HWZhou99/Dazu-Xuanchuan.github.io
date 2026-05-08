@@ -1,0 +1,581 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>大足石刻数字成果宣传</title>
+    <style>
+        /* 基础重置 + 微信优化 */
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+            -webkit-touch-callout: none;
+            user-select: none;
+        }
+        
+        body {
+            height: 100vh;
+            width: 100%;
+            overflow: hidden;
+            position: fixed;
+            top: 0;
+            left: 0;
+            background-color: #000;
+            overscroll-behavior: none;
+        }
+        /* 滑动容器 */
+        
+        .slides-container {
+            height: 100%;
+            width: 100%;
+            transition: transform 0.5s cubic-bezier(0.25, 0.9, 0.3, 1.05);
+            will-change: transform;
+        }
+        /* 每一页图片容器 */
+        
+        .slide-page {
+            width: 100%;
+            height: 100vh;
+            background-position: center center;
+            background-repeat: no-repeat;
+            background-color: #ffffff;
+        }
+        /* 电脑端：保持 1:2 比例（contain） */
+        
+        .slide-page {
+            background-size: contain;
+        }
+        /* 手机端：铺满全屏（cover） */
+        
+        @media (max-width: 768px) {
+            .slide-page {
+                background-size: cover;
+            }
+        }
+        /* 右侧圆点导航 */
+        
+        .pagination {
+            position: fixed;
+            right: max(15px, env(safe-area-inset-right));
+            top: 50%;
+            transform: translateY(-50%);
+            z-index: 30;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            background: rgba(0, 0, 0, 0.35);
+            backdrop-filter: blur(6px);
+            padding: 8px 5px;
+            border-radius: 30px;
+            align-items: center;
+            border: 0.5px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        .dot {
+            width: 5px;
+            height: 5px;
+            background-color: rgba(255, 255, 255, 0.6);
+            border-radius: 50%;
+            transition: all 0.2s ease;
+            cursor: pointer;
+        }
+        
+        .dot.active {
+            background-color: #ffffff;
+            width: 18px;
+            border-radius: 4px;
+            box-shadow: 0 0 6px rgba(255, 255, 255, 0.8);
+        }
+        /* 左下角上下按钮 */
+        
+        .nav-arrows {
+            position: fixed;
+            bottom: max(20px, env(safe-area-inset-bottom));
+            left: max(16px, env(safe-area-inset-left));
+            z-index: 30;
+            display: flex;
+            gap: 8px;
+            background: rgba(0, 0, 0, 0.4);
+            backdrop-filter: blur(10px);
+            padding: 5px 10px;
+            border-radius: 40px;
+            border: 0.5px solid rgba(255, 255, 255, 0.25);
+        }
+        
+        .nav-btn {
+            background: rgba(255, 255, 255, 0.2);
+            border: none;
+            color: white;
+            font-size: 18px;
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: 0.2s;
+            font-weight: bold;
+        }
+        
+        .nav-btn:active {
+            background: rgba(255, 255, 255, 0.55);
+            transform: scale(0.92);
+        }
+        
+        .nav-btn.disabled {
+            opacity: 0.3;
+            pointer-events: none;
+        }
+        
+        @media (max-width: 768px) {
+            .nav-btn {
+                width: 30px;
+                height: 30px;
+                font-size: 16px;
+            }
+            .nav-arrows {
+                gap: 6px;
+                padding: 4px 8px;
+                bottom: 16px;
+                left: 12px;
+            }
+            .pagination {
+                right: 10px;
+                gap: 6px;
+                padding: 6px 4px;
+            }
+            .dot {
+                width: 4px;
+                height: 4px;
+            }
+            .dot.active {
+                width: 14px;
+            }
+        }
+        /* ----- 图片预览层 (支持缩放/拖动) ----- */
+        
+        .image-viewer {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.95);
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.3s ease, visibility 0.3s;
+            backdrop-filter: blur(8px);
+        }
+        
+        .image-viewer.active {
+            opacity: 1;
+            visibility: visible;
+        }
+        
+        .viewer-img {
+            max-width: 90%;
+            max-height: 90%;
+            object-fit: contain;
+            transform-origin: center center;
+            transition: transform 0.05s linear;
+            will-change: transform;
+            touch-action: none;
+            /* 完全由JS控制手势，避免浏览器缩放 */
+        }
+        /* 关闭提示小图标（可选） */
+        
+        .viewer-close {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            width: 40px;
+            height: 40px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 28px;
+            cursor: pointer;
+            backdrop-filter: blur(10px);
+            z-index: 1001;
+        }
+        /* 图片背景示例 (1:2 比例) */
+        
+        .page-1 {
+            background-image: url('pic/1.png');
+        }
+        
+        .page-2 {
+            background-image: url('pic/11.png');
+        }
+        
+        .page-3 {
+            background-image: url('pic/12.png');
+        }
+        
+        .page-4 {
+            background-image: url('pic/13.png');
+        }
+        
+        .page-5 {
+            background-image: url('pic/14.png');
+        }
+        
+        .page-6 {
+            background-image: url('pic/15.png');
+        }
+        
+        .page-7 {
+            background-image: url('pic/18.png');
+        }
+        
+        .page-8 {
+            background-image: url('pic/17.png');
+        }
+        
+        .page-9 {
+            background-image: url('pic/16.png');
+        }
+        
+        .page-10 {
+            background-image: url('pic/19.png');
+        }
+    </style>
+</head>
+
+<body>
+    <div class="slides-container" id="slidesContainer">
+        <div class="slide-page page-1"></div>
+        <div class="slide-page page-2"></div>
+        <div class="slide-page page-3"></div>
+        <div class="slide-page page-4"></div>
+        <div class="slide-page page-5"></div>
+        <div class="slide-page page-6"></div>
+        <div class="slide-page page-7"></div>
+        <div class="slide-page page-8"></div>
+        <div class="slide-page page-9"></div>
+        <div class="slide-page page-10"></div>
+    </div>
+
+    <div class="pagination" id="paginationDots"></div>
+    <div class="nav-arrows">
+        <button class="nav-btn" id="prevBtn" aria-label="上一页">▲</button>
+        <button class="nav-btn" id="nextBtn" aria-label="下一页">▼</button>
+    </div>
+
+    <!-- 图片预览浮层 -->
+    <div class="image-viewer" id="imageViewer">
+        <div class="viewer-close" id="viewerClose">✕</div>
+        <img class="viewer-img" id="viewerImg" alt="预览图">
+    </div>
+
+    <script>
+        (function() {
+            // ---------- 翻页逻辑 ----------
+            const container = document.getElementById('slidesContainer');
+            const slides = document.querySelectorAll('.slide-page');
+            const total = slides.length;
+            let currentIndex = 0;
+            let isAnimating = false;
+            let touchStartY = 0;
+
+            const dotsContainer = document.getElementById('paginationDots');
+            const prevBtn = document.getElementById('prevBtn');
+            const nextBtn = document.getElementById('nextBtn');
+
+            function updateTransform() {
+                if (!container) return;
+                container.style.transform = `translateY(${-currentIndex * 100}vh)`;
+            }
+
+            function updateUI() {
+                const dots = document.querySelectorAll('.dot');
+                dots.forEach((dot, idx) => {
+                    if (idx === currentIndex) dot.classList.add('active');
+                    else dot.classList.remove('active');
+                });
+                prevBtn.classList.toggle('disabled', currentIndex === 0);
+                nextBtn.classList.toggle('disabled', currentIndex === total - 1);
+            }
+
+            function goToPage(index) {
+                if (isAnimating) return false;
+                index = Math.min(Math.max(0, index), total - 1);
+                if (index === currentIndex) return false;
+                isAnimating = true;
+                currentIndex = index;
+                updateTransform();
+                updateUI();
+                const onTransitionEnd = () => {
+                    isAnimating = false;
+                    container.removeEventListener('transitionend', onTransitionEnd);
+                };
+                container.addEventListener('transitionend', onTransitionEnd);
+                setTimeout(() => {
+                    if (isAnimating) {
+                        isAnimating = false;
+                        container.removeEventListener('transitionend', onTransitionEnd);
+                    }
+                }, 600);
+                return true;
+            }
+
+            function nextPage() {
+                if (currentIndex < total - 1 && !isAnimating) goToPage(currentIndex + 1);
+            }
+
+            function prevPage() {
+                if (currentIndex > 0 && !isAnimating) goToPage(currentIndex - 1);
+            }
+
+            function createDots() {
+                dotsContainer.innerHTML = '';
+                for (let i = 0; i < total; i++) {
+                    const dot = document.createElement('div');
+                    dot.classList.add('dot');
+                    if (i === currentIndex) dot.classList.add('active');
+                    dot.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        if (!isAnimating) goToPage(i);
+                    });
+                    dotsContainer.appendChild(dot);
+                }
+            }
+
+            // 滚轮、触摸、键盘事件
+            function handleWheel(e) {
+                if (isAnimating) return;
+                const delta = e.deltaY;
+                if (delta > 0 && currentIndex < total - 1) {
+                    e.preventDefault();
+                    nextPage();
+                } else if (delta < 0 && currentIndex > 0) {
+                    e.preventDefault();
+                    prevPage();
+                } else e.preventDefault();
+            }
+
+            function handleTouchStart(e) {
+                if (!isAnimating) touchStartY = e.touches[0].clientY;
+            }
+
+            function handleTouchEnd(e) {
+                if (isAnimating || touchStartY === 0) return;
+                const diff = touchStartY - e.changedTouches[0].clientY;
+                if (Math.abs(diff) > 25) {
+                    if (diff > 0 && currentIndex < total - 1) nextPage();
+                    else if (diff < 0 && currentIndex > 0) prevPage();
+                }
+                touchStartY = 0;
+            }
+
+            function handleKeydown(e) {
+                if (e.key === 'ArrowDown' || e.key === 'ArrowRight' || e.key === ' ' || e.key === 'Space') {
+                    e.preventDefault();
+                    nextPage();
+                } else if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') {
+                    e.preventDefault();
+                    prevPage();
+                }
+            }
+
+            function bindEvents() {
+                window.addEventListener('wheel', handleWheel, {
+                    passive: false
+                });
+                window.addEventListener('touchstart', handleTouchStart, {
+                    passive: false
+                });
+                window.addEventListener('touchend', handleTouchEnd);
+                window.addEventListener('keydown', handleKeydown);
+                prevBtn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    prevPage();
+                });
+                nextBtn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    nextPage();
+                });
+            }
+
+            // ---------- 图片缩放查看器逻辑 ----------
+            const viewer = document.getElementById('imageViewer');
+            const viewerImg = document.getElementById('viewerImg');
+            const closeBtn = document.getElementById('viewerClose');
+
+            let imgScale = 1;
+            let imgTranslateX = 0,
+                imgTranslateY = 0;
+            let initialDistance = 0;
+            let initialScale = 1;
+            let startX = 0,
+                startY = 0;
+            let isDragging = false;
+            let currentGesture = null; // 'pinch' or 'pan'
+
+            // 获取当前页的背景图片URL
+            function getCurrentImageUrl() {
+                const currentPage = slides[currentIndex];
+                let bgUrl = window.getComputedStyle(currentPage).backgroundImage;
+                if (bgUrl && bgUrl !== 'none') {
+                    // 提取 url("...") 中的链接
+                    const match = bgUrl.match(/url\(["']?([^"')]+)["']?\)/);
+                    if (match) return match[1];
+                }
+                return '';
+            }
+
+            // 打开预览，重置缩放和平移
+            function openViewer(imageUrl) {
+                if (!imageUrl) return;
+                viewerImg.src = imageUrl;
+                // 重置变换
+                imgScale = 1;
+                imgTranslateX = 0;
+                imgTranslateY = 0;
+                applyTransform();
+                viewer.classList.add('active');
+                // 禁止页面滚动穿透
+                document.body.style.overflow = 'hidden';
+            }
+
+            function closeViewer() {
+                viewer.classList.remove('active');
+                document.body.style.overflow = '';
+                // 重置手势状态
+                initialDistance = 0;
+                isDragging = false;
+            }
+
+            function applyTransform() {
+                viewerImg.style.transform = `translate(${imgTranslateX}px, ${imgTranslateY}px) scale(${imgScale})`;
+            }
+
+            // 触摸缩放/拖动核心
+            function handleViewerTouchStart(e) {
+                e.preventDefault();
+                const touches = e.touches;
+                if (touches.length === 2) {
+                    // 双指缩放
+                    const dx = touches[0].clientX - touches[1].clientX;
+                    const dy = touches[0].clientY - touches[1].clientY;
+                    initialDistance = Math.hypot(dx, dy);
+                    initialScale = imgScale;
+                    currentGesture = 'pinch';
+                } else if (touches.length === 1) {
+                    // 单指拖动
+                    startX = touches[0].clientX - imgTranslateX;
+                    startY = touches[0].clientY - imgTranslateY;
+                    isDragging = true;
+                    currentGesture = 'pan';
+                }
+            }
+
+            function handleViewerTouchMove(e) {
+                e.preventDefault();
+                const touches = e.touches;
+                if (currentGesture === 'pinch' && touches.length === 2) {
+                    const dx = touches[0].clientX - touches[1].clientX;
+                    const dy = touches[0].clientY - touches[1].clientY;
+                    const distance = Math.hypot(dx, dy);
+                    if (initialDistance > 0) {
+                        let newScale = initialScale * (distance / initialDistance);
+                        newScale = Math.min(Math.max(0.5, newScale), 4); // 缩放范围 0.5 ~ 4
+                        imgScale = newScale;
+                        applyTransform();
+                    }
+                } else if (currentGesture === 'pan' && touches.length === 1 && imgScale > 0.5) {
+                    // 拖动平移，边界限制可选，但不做严格限制让用户可以任意拖拽
+                    imgTranslateX = touches[0].clientX - startX;
+                    imgTranslateY = touches[0].clientY - startY;
+                    applyTransform();
+                }
+            }
+
+            function handleViewerTouchEnd(e) {
+                e.preventDefault();
+                currentGesture = null;
+                isDragging = false;
+                initialDistance = 0;
+                // 双击复位（可选简易实现）
+            }
+
+            // 双击复位
+            function handleViewerDoubleTap(e) {
+                e.stopPropagation();
+                imgScale = 1;
+                imgTranslateX = 0;
+                imgTranslateY = 0;
+                applyTransform();
+            }
+
+            // 给预览层绑定事件
+            function bindViewerEvents() {
+                viewer.addEventListener('touchstart', handleViewerTouchStart, {
+                    passive: false
+                });
+                viewer.addEventListener('touchmove', handleViewerTouchMove, {
+                    passive: false
+                });
+                viewer.addEventListener('touchend', handleViewerTouchEnd);
+                viewer.addEventListener('touchcancel', handleViewerTouchEnd);
+                viewerImg.addEventListener('dblclick', handleViewerDoubleTap); // 电脑端双击复位
+                closeBtn.addEventListener('click', closeViewer);
+                viewer.addEventListener('click', (e) => {
+                    if (e.target === viewer) closeViewer(); // 点击背景关闭
+                });
+            }
+
+            // 点击图片打开预览
+            function bindSlideClick() {
+                slides.forEach((slide, idx) => {
+                    slide.addEventListener('click', (e) => {
+                        // 如果点击的是圆点或按钮区域，不触发预览
+                        if (e.target.closest('.pagination') || e.target.closest('.nav-arrows')) return;
+                        // 获取当前显示页面的图片URL（点击任何位置都打开当前页图片）
+                        const imgUrl = getCurrentImageUrl();
+                        if (imgUrl) openViewer(imgUrl);
+                    });
+                });
+            }
+
+            // 初始化
+            function init() {
+                createDots();
+                updateTransform();
+                updateUI();
+                bindEvents();
+                bindSlideClick();
+                bindViewerEvents();
+                window.addEventListener('resize', () => updateTransform());
+                setTimeout(() => updateTransform(), 100);
+            }
+            init();
+        })();
+    </script>
+    <!-- 
+        功能说明：
+        - 全屏滑动翻页（滚轮/触摸/键盘/圆点/箭头）。
+        - 点击任意图片 → 打开高清预览层，支持：
+            ✔ 双指缩放（范围 0.5x ~ 4x）
+            ✔ 单指拖动
+            ✔ 双击复位缩放
+            ✔ 点击右上角 ✕ 或背景关闭
+        - 图片比例固定 1:2，手机端铺满，电脑端完整显示。
+        - 微信内完美禁用长按菜单/保存图片/滚动穿透。
+        图片替换：修改 .page-1 至 .page-5 的 background-image 链接即可。
+    -->
+</body>
+
+</html>
