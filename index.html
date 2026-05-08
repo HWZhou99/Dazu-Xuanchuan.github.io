@@ -520,22 +520,24 @@
                 applyTransform();
             }
 
-            // 给预览层绑定事件
+             // 给预览层绑定事件
             function bindViewerEvents() {
-                viewer.addEventListener('touchstart', handleViewerTouchStart, {
+                // 手势操作只绑定在图片元素上，避免影响关闭按钮
+                viewerImg.addEventListener('touchstart', handleViewerTouchStart, {
                     passive: false
                 });
-                viewer.addEventListener('touchmove', handleViewerTouchMove, {
+                viewerImg.addEventListener('touchmove', handleViewerTouchMove, {
                     passive: false
                 });
-                viewer.addEventListener('touchend', handleViewerTouchEnd);
-                viewer.addEventListener('touchcancel', handleViewerTouchEnd);
+                viewerImg.addEventListener('touchend', handleViewerTouchEnd);
+                viewerImg.addEventListener('touchcancel', handleViewerTouchEnd);
                 viewerImg.addEventListener('dblclick', handleViewerDoubleTap); // 电脑端双击复位
                 closeBtn.addEventListener('click', closeViewer);
                 viewer.addEventListener('click', (e) => {
-                    if (e.target === viewer) closeViewer(); // 点击背景关闭
+                    if (e.target === viewer) closeViewer();
                 });
             }
+
 
             // 点击图片打开预览
             function bindSlideClick() {
